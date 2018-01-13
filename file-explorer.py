@@ -46,9 +46,17 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 		else:
 			filepath = text
 
+		# find "directory/../" and collapse them.
+		location = filepath.find("/..")
+		while(location > 0):
+			elimstart = filepath.rfind("/",0,location)
+			if(elimstart <= 0):
+				elimstart = location
+			filepath = filepath[0:elimstart] + filepath[location+3:]
+			location = filepath.find("/..")
 
 
-		# file => open it
+		# file => open it`
 		if(os.path.isfile(filepath)):
 			self.window.open_file(filepath)
 
