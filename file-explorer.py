@@ -3,6 +3,7 @@ import sublime_plugin
 import os
 
 class emacsstyleopenCommand(sublime_plugin.WindowCommand):
+
 	def run(self):
 
 		self.window.show_input_panel("Find file:", "", self.on_done, None, None)
@@ -11,6 +12,10 @@ class emacsstyleopenCommand(sublime_plugin.WindowCommand):
 
 		region = sublime.Region(0,self.window.active_view().text_point(1,0)-1)
 		previous_path = self.window.active_view().substr(region)
+
+		# close an existing directory list of a new one is being opened on top.
+		if(previous_path != "" and previous_path[0] == "/"):
+			self.window.run_command("close")
 
 		# if there is no previous path, set it to the first open folder.
 		if(previous_path == "" or previous_path[0] != "/"):
@@ -49,6 +54,11 @@ class emacsstyleopenCommand(sublime_plugin.WindowCommand):
 
 			# create output file
 			self.window.new_file()
+			self.window.active_view().set_scratch(True)
+			lastdir = filepath[filepath.rfind("/"):]
+			if(lastdir != filepath):
+				lastdir = "..." + lastdir
+			self.window.active_view().set_name(lastdir)
 
 			self.window.active_view().run_command("insertfilename",
 				{"line": filepath + "\nDirectory contents:\n\n", 
@@ -63,10 +73,12 @@ class emacsstyleopenCommand(sublime_plugin.WindowCommand):
 
 		# neither => display error message
 		else:
+			self.window.new_file()
+			self.window.active_view().set_scratch(True)
+			self.window.active_view().set_name("Error")
 			self.window.active_view().run_command("insertfilename",
 				{"line": filepath + "\nError: not a valid file or directory path\n",
 				"point": 0})
-
 
 class insertfilenameCommand(sublime_plugin.TextCommand):
 	def run(self, edit, line, point):
