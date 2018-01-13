@@ -2,7 +2,7 @@ import sublime
 import sublime_plugin
 import os
 
-class emacsstyleopenCommand(sublime_plugin.WindowCommand):
+class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 
 	def run(self):
 
@@ -22,8 +22,13 @@ class emacsstyleopenCommand(sublime_plugin.WindowCommand):
 			previous_path = self.window.folders()[0]
 
 		# Special case: ".." (go up one directory)
+		# if statement provides protection for going up too far
 		if(text == ".."):
-			filepath = previous_path[:previous_path.rfind("/")]
+			lastdirindex = previous_path.rfind("/")
+			if(lastdirindex != 0):
+				filepath = previous_path[:lastdirindex]
+			else:
+				filepath = previous_path
 
 		# Special case: "." (do nothing)
 		elif(text == "."):
