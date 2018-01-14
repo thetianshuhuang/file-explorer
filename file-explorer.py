@@ -79,10 +79,17 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 			self.window.new_file()
 			self.window.active_view().set_scratch(True)
 			lastdir = filepath[filepath.rfind("/"):]
-			if(lastdir != filepath):
-				lastdir = "..." + lastdir
-			self.window.active_view().set_name(lastdir)
 
+			# in csv mode, name the file appropriately
+			if(flags == "v"):
+				self.window.active_view().set_name(lastdir + "_contents.csv")
+			# otherwise, make the current directory clear
+			else:
+				if(lastdir != filepath):
+					lastdir = "..." + lastdir
+				self.window.active_view().set_name(lastdir)
+
+			# add title and information
 			self.window.active_view().run_command("insertfilename",
 				{"line": filepath + "\nDirectory contents:\n\n", 
 				"point": 0})
@@ -92,31 +99,36 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 			for x in range(0,len(directory_contents)):
 				point = self.window.active_view().text_point(x + info_offset,0)
 				
-				# s flag: display file sizes
-				if(flags == "s"):
+				# c (clean) flag - no flags: just display file name
+				if(flags == "c"):
+					fileinfo = directory_contents[x]
+
+				# v flag - output as comma separated values
+				if(flags == "v"):
 					filesize = os.stat(filepath + "/" + directory_contents[x]).st_size
+					fileinfo = str(filesize) + "," + directory_contents[x] + ","
+
+				# normal operation: display file sizes and file names
+				else:
+					# get filesize
+					filesize = os.stat(filepath + "/" + directory_contents[x]).st_size
+					
 					# filesize > 1GB -> use GB suffix
 					if(filesize >= 1000000000):
 						filesizestr = str(round(filesize / 1000000000.,1)) + " GB"
-					
 					# 1GB > filesize > 1MB
 					elif(filesize >= 1000000):
 						filesizestr = str(round(filesize / 1000000.,1)) + " MB"
-
 					# 1MB > filesize > 1KB
 					elif(filesize >= 1000):
 						filesizestr = str(round(filesize / 1000,1)) + "KB"	
-
 					# 1KB > filesize
 					else:
 						filesizestr = str(filesize) + " bytes"
 
+					# align file names at 12 columns (4 tabs)
 					filesizestr += " " * (12 - len(filesizestr))
 					fileinfo = filesizestr + directory_contents[x]
-
-				# no flags: just display file name
-				else:
-					fileinfo = directory_contents[x]
 
 				# write file info	
 				self.window.active_view().run_command("insertfilename", 
