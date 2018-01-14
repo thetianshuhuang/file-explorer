@@ -10,6 +10,16 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 
 	def on_done(self, text):
 
+		# command processing
+		# flags are found in the string 'flags'.
+		lastslash = text.rfind("/")
+		lastdash = text.rfind(" -")
+		if(lastdash > lastslash and lastdash > 0):
+			flags = text[lastdash+2:]
+			text = text[0:lastdash]
+		else:
+			flags = ""
+
 		region = sublime.Region(0,self.window.active_view().text_point(1,0)-1)
 		previous_path = self.window.active_view().substr(region)
 
@@ -77,11 +87,40 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 				{"line": filepath + "\nDirectory contents:\n\n", 
 				"point": 0})
 
+			# display files in directory
 			info_offset = 3
 			for x in range(0,len(directory_contents)):
 				point = self.window.active_view().text_point(x + info_offset,0)
+				
+				# s flag: display file sizes
+				if(flags == "s"):
+					filesize = os.stat(filepath + "/" + directory_contents[x]).st_size
+					# filesize > 1GB -> use GB suffix
+					if(filesize >= 1000000000):
+						filesizestr = str(round(filesize / 1000000000.,1)) + " GB"
+					
+					# 1GB > filesize > 1MB
+					elif(filesize >= 1000000):
+						filesizestr = str(round(filesize / 1000000.,1)) + " MB"
+
+					# 1MB > filesize > 1KB
+					elif(filesize >= 1000):
+						filesizestr = str(round(filesize / 1000,1)) + "KB"	
+
+					# 1KB > filesize
+					else:
+						filesizestr = str(filesize) + " bytes"
+
+					filesizestr += " " * (12 - len(filesizestr))
+					fileinfo = filesizestr + directory_contents[x]
+
+				# no flags: just display file name
+				else:
+					fileinfo = directory_contents[x]
+
+				# write file info	
 				self.window.active_view().run_command("insertfilename", 
-					{"line": directory_contents[x], 
+					{"line": fileinfo, 
 					"point": point})
 
 		# neither => display error message
@@ -94,5 +133,5 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 				"point": 0})
 
 class insertfilenameCommand(sublime_plugin.TextCommand):
-	def run(self, edit, line, point):
+	def run(self, edit, line, point):	
 		self.view.insert(edit, point, line + "\n")
