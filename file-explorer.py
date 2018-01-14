@@ -1,6 +1,7 @@
 import sublime
 import sublime_plugin
 import os
+import datetime
 
 class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 
@@ -91,15 +92,15 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 
 			# add title and information
 			self.window.active_view().run_command("insertfilename",
-				{"line": filepath + "\nDirectory contents:\n\n", 
+				{"line": filepath + "\n\n", 
 				"point": 0})
 
 			# display files in directory
-			info_offset = 3
+			info_offset = 2
 			for x in range(0,len(directory_contents)):
 				point = self.window.active_view().text_point(x + info_offset,0)
 				
-				# c (clean) flag - no flags: just display file name
+				# c (clean) flag: just display file name
 				if(flags == "c"):
 					fileinfo = directory_contents[x]
 
@@ -129,6 +130,27 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 					# align file names at 12 columns (4 tabs)
 					filesizestr += " " * (12 - len(filesizestr))
 					fileinfo = filesizestr + directory_contents[x]
+
+					# get date
+					months = ("Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Nov", "Dec")
+
+					filedate = os.stat(filepath + "/" + directory_contents[x]).st_mtime
+					filedatelist = datetime.datetime.fromtimestamp(filedate)
+					
+					# format date as MMM DD HH:MM
+					filedatestr = months[filedatelist.month-1] + " " 
+					if(filedatelist.day < 10):
+						filedatestr += "0" 
+					filedatestr += str(filedatelist.day) + " "
+					if(filedatelist.hour < 10):
+						filedatestr += "0" 
+					filedatestr += str(filedatelist.hour) + ":"
+					if(filedatelist.minute < 10): 
+						filedatestr += "0" 
+					filedatestr += str(filedatelist.minute)
+					
+					# add to file info
+					fileinfo = filedatestr + "    " + fileinfo
 
 				# write file info	
 				self.window.active_view().run_command("insertfilename", 
