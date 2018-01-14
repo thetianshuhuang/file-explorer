@@ -107,7 +107,8 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 				# v flag - output as comma separated values
 				elif(flags == "v"):
 					filesize = os.stat(filepath + "/" + directory_contents[x]).st_size
-					fileinfo = str(filesize) + "," + directory_contents[x] + ","
+					filedate = os.stat(filepath + "/" + directory_contents[x]).st_mtime
+					fileinfo = str(filedate) + "," + str(filesize) + "," + directory_contents[x] + ","
 
 				# normal operation: display file sizes and file names
 				else:
@@ -132,12 +133,13 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 					fileinfo = filesizestr + directory_contents[x]
 
 					# get date
-					months = ("Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Nov", "Dec")
+					months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 					filedate = os.stat(filepath + "/" + directory_contents[x]).st_mtime
 					filedatelist = datetime.datetime.fromtimestamp(filedate)
 					
 					# format date as MMM DD HH:MM
+					print(filedatelist.month)
 					filedatestr = months[filedatelist.month-1] + " " 
 					if(filedatelist.day < 10):
 						filedatestr += "0" 
