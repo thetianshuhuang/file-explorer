@@ -104,7 +104,7 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 					fileinfo = directory_contents[x]
 
 				# v flag - output as comma separated values
-				if(flags == "v"):
+				elif(flags == "v"):
 					filesize = os.stat(filepath + "/" + directory_contents[x]).st_size
 					fileinfo = str(filesize) + "," + directory_contents[x] + ","
 
