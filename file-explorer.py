@@ -30,7 +30,11 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 
 		# if there is no previous path, set it to the first open folder.
 		if(previous_path == "" or previous_path[0] != "/"):
-			previous_path = self.window.folders()[0]
+			try:
+				previous_path = self.window.folders()[0]
+			# open to /home if no folders are open.
+			except:
+				previous_path = "/home"
 
 		# Special case: ".." (go up one directory)
 		# if statement provides protection for going up too far
@@ -45,7 +49,6 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 		elif(text == "."):
 			filepath = previous_path
 
-		# A path has already be selected,
 		# and the input is to be appended to the existing path
 		elif(text[0] != "/"):
 			# add dividing '\' if one does not already exist
