@@ -70,8 +70,12 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 			location = filepath.find("/..")
 
 
-		# file => open it`
+		# file => open it
 		if(os.path.isfile(filepath)):
+			self.window.open_file(filepath)
+
+		# is file name, but file doesn't exist
+		if(filepath.rfind(".") > filepath.rfind("/") and filepath.rfind(".") != -1):
 			self.window.open_file(filepath)
 
 		# directory => display contents
