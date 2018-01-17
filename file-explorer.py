@@ -36,8 +36,6 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 
 		username = getpass.getuser()
 
-		print(self.active_explorer_windows)
-
 		# detect operating system
 		if (os.name == 'posix'):
 			self.default_path = self.default_linux_path + self.div_posix + username
@@ -92,7 +90,7 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 		# Special case: ".." (go up one directory)
 		# if statement provides protection for going up too far
 		if(text == ".."):
-			lastdirindex = previous_path.rfind(self.div)
+			lastdirindex = previous_path.rfind(self.div,0,len(previous_path)-1)
 			if(lastdirindex != 0):
 				filepath = previous_path[:lastdirindex]
 			else:
@@ -193,6 +191,11 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 	#	
 	#	--------------------------------
 	def display_directory_contents(self,filepath,flags):
+
+		# normalize filepath
+		if(filepath[-1] != self.div):
+			filepath = filepath + self.div
+
 		# get directory contents
 		directory_contents = os.listdir(filepath)
 
@@ -271,7 +274,7 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
 				# add to file info
 				fileinfo = filedatestr + "    " + fileinfo
 
-			# write file info	
+			# write file info
 			self.window.active_view().run_command("insertfilename", 
 				{"line": fileinfo, 
 				"point": point})
