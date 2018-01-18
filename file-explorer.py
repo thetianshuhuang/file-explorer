@@ -1,4 +1,3 @@
-import sublime
 import sublime_plugin
 import os
 import getpass
@@ -10,6 +9,7 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
     #   --------------------------------
     #
     #   Attributes
+    #
     #   --------------------------------
 
     # OS secific paths
@@ -79,6 +79,18 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
         text = processed_command[0]
         flags = processed_command[1]
 
+        # generate filepath
+        filepath = self.compute_filepath(text)
+
+        # open the filepath
+        self.open_path(filepath, flags)
+
+    #   --------------------------------
+    #
+    #   Compute filepath
+    #
+    #   --------------------------------
+    def compute_filepath(self, text):
         previous_path = self.check_active_view()
 
         # Special case: ".." (go up one directory)
@@ -109,13 +121,10 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
         else:
             filepath = text
 
-        print(filepath)
-
         # collapse '/../' operator
         filepath = self.collapse_parent_dir(filepath)
 
-        # open the filepath
-        self.open_path(filepath, flags)
+        return(filepath)
 
     #   --------------------------------
     #
