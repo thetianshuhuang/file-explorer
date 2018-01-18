@@ -20,6 +20,10 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
     windows_root = "C:\\"
     linux_root = "/"
 
+    illegal_linux_chars = ["\0"]
+    illegal_windows_chars = ["<", ">", ":", '"', "/", "|", "?", "*"]
+    illegal_unrecognized_chars = []
+
     # OS specific file divisions
     div_posix = "/"
     div_nt = "\\"
@@ -28,12 +32,10 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
     # plugin data
     active_explorer_windows = {}
     error_descriptions = {
-        "PermissionError":
-            "Insufficient permissions."
-            " Run as root to see the contents of this filepath.",
-        "IllegalPathError":
-            "Illegal filepath."
-            "One or more characters in this filepath is forbidden."
+        "PermissionError": "Insufficient permissions. \
+            Run as root to see the contents of this filepath.",
+        "IllegalPathError": "Illegal filepath. \
+            One or more characters in this filepath is forbidden."
     }
 
     # plugin settings
@@ -54,15 +56,18 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
                 self.default_linux_path + self.div_posix + username)
             self.div = self.div_posix
             self.root_dir = self.linux_root
+            self.illegal_chars = self.illegal_linux_chars
         elif (os.name == 'nt'):
             self.default_path = (
                 self.default_windows_path + self.div_nt + username)
             self.div = self.div_nt
             self.root_dir = self.windows_root
+            self.illegal_chars = self.illegal_windows_chars
         else:
             self.default_path = self.unrecognized_os_path
             self.div = self.div_unkn
             self.root_dir = self.unrecognized_os_path
+            self.illegal_chars = self.default_unrecognized_chars
 
     #   --------------------------------
     #
@@ -228,11 +233,15 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
     #   --------------------------------
     def open_path(self, filepath, flags):
 
+        print("running")
+
         # check for invalid filepaths
-        exception_type = self.check_for_exceptions(filepath)
-        if(exception_type != "pass"):
-            self.create_new_view(filepath)
-            self.display_error_message(filepath, exception_type)
+        if(self.is_illegal_path(filepath)):
+            self.display_error_message(filepath, "IllegalPathError")
+
+        # check for permissions
+        elif(self.insufficient_privilege(filepath)):
+            self.display_error_message(filepath, "PermissionError")
 
         # file => open it
         elif(os.path.isfile(filepath)):
@@ -244,35 +253,38 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
 
         # otherwise, create the output file.
         else:
-            self.create_new_view(filepath)
-            self.display_directory_contents(filepath, flags)
-
-    #   --------------------------------
-    #
-    #   Create new view
-    #
-    #   --------------------------------
-    def create_new_view(self, filepath):
-            # set to scratch for silent closings.
+            # create new file, and set to scratch for silent closings.
             self.window.new_file()
             self.window.active_view().set_scratch(True)
             # log the ID and filepath of the new window
             self.active_explorer_windows.update({
                 self.window.active_view().id(): filepath})
 
+            # must be a directory => display contents
+            self.display_directory_contents(filepath, flags)
+
     #   --------------------------------
     #
-    #   Check for exceptions in the filepath
+    #   Check for illegal paths
     #
     #   --------------------------------
-    def check_for_exceptions(self, filepath):
+    def is_illegal_path(self, filepath):
+        for char in self.illegal_chars:
+            if(filepath.find(char) >= 0):
+                return(True)
+        return(False)
+
+    #   --------------------------------
+    #
+    #   Check for priviledged paths
+    #
+    #   --------------------------------
+    def insufficient_priviledge(filepath):
         try:
             os.listdir(filepath)
-            return("pass")
-        except OSError:
-            return("IllegalPathError")
+            return(False)
         except PermissionError:
-            return("PermissionError")
+            return(True)
 
     #   --------------------------------
     #
