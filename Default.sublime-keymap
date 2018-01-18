@@ -1,6 +1,6 @@
 [
 { 
 	"keys": ["ctrl+x","ctrl+f"],
-	"command": "emacs_style_file_explorer"
+	"command": "fileexplorer"
 }
 ]

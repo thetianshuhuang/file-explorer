@@ -5,18 +5,19 @@ import getpass
 import datetime
 
 
-class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
+class fileexplorerCommand(sublime_plugin.WindowCommand):
 
     #   --------------------------------
     #
     #   Attributes
-    #
     #   --------------------------------
 
     # OS secific paths
     default_linux_path = "/home"
     default_windows_path = "C:\\Users"
     unrecognized_os_path = ""
+    windows_root = "C:\\"
+    linux_root = "/"
 
     # OS specific file divisions
     div_posix = "/"
@@ -24,7 +25,10 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
     div_unkn = "/"
 
     # plugin data
-    active_explorer_windows = []
+    active_explorer_windows = {}
+
+    # plugin settings
+    info_offset = 2
 
     #   --------------------------------
     #
@@ -40,13 +44,16 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
             self.default_path = (
                 self.default_linux_path + self.div_posix + username)
             self.div = self.div_posix
+            self.root_dir = self.linux_root
         elif (os.name == 'nt'):
             self.default_path = (
                 self.default_windows_path + self.div_nt + username)
             self.div = self.div_nt
+            self.root_dir = self.windows_root
         else:
             self.default_path = self.unrecognized_os_path
             self.div = self.div_unkn
+            self.root_dir = self.unrecognized_os_path
 
     #   --------------------------------
     #
@@ -72,30 +79,20 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
         text = processed_command[0]
         flags = processed_command[1]
 
-        # close an existing directory list of a new one is being opened on top.
-        if(self.check_active_view()):
-            region = sublime.Region(
-                0, self.window.active_view().text_point(1, 0) - 1)
-            previous_path = self.window.active_view().substr(region)
-            self.window.run_command("close")
-
-        # if there is no previous path, set it to the first open folder.
-        # if that still isn't available, open the defualt path.
-        else:
-            try:
-                previous_path = self.window.folders()[0]
-            except IndexError:
-                previous_path = self.default_path
+        previous_path = self.check_active_view()
 
         # Special case: ".." (go up one directory)
         # if statement provides protection for going up too far
         if(text == ".."):
             lastdirindex = previous_path.rfind(
                 self.div, 0, len(previous_path) - 1)
-            if(lastdirindex != 0):
+            if(lastdirindex >= 0):
                 filepath = previous_path[:lastdirindex]
             else:
                 filepath = previous_path
+            # empty filepath protection
+            if(filepath == ""):
+                filepath = self.root_dir
 
         # Special case: "." (do nothing)
         elif(text == "."):
@@ -112,7 +109,20 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
         else:
             filepath = text
 
-        # find "directory/../" and collapse them.
+        print(filepath)
+
+        # collapse '/../' operator
+        filepath = self.collapse_parent_dir(filepath)
+
+        # open the filepath
+        self.open_path(filepath, flags)
+
+    #   --------------------------------
+    #
+    #   Collapse parent directory operators
+    #
+    #   --------------------------------
+    def collapse_parent_dir(self, filepath):
         location = filepath.find(self.div + "..")
         while(location > 0):
             elimstart = filepath.rfind(self.div, 0, location)
@@ -121,7 +131,7 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
             filepath = filepath[0:elimstart] + filepath[location + 3:]
             location = filepath.find(self.div + "..")
 
-        self.open_path(filepath, flags)
+        return(filepath)
 
     #   --------------------------------
     #
@@ -129,11 +139,23 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
     #
     #   --------------------------------
     def check_active_view(self):
-        for view in self.active_explorer_windows:
-            if(view == self.window.active_view().id()):
-                self.active_explorer_windows.remove(view)
-                return True
-        return False
+
+        active_view = self.window.active_view().id()
+
+        # close an existing directory list of a new one is being opened on top.
+        # set the previous path to the saved one
+        try:
+            previous_path = self.active_explorer_windows[active_view]
+            self.window.run_command("close")
+        except KeyError:
+            # otherwise, set to the first open folder
+            try:
+                previous_path = self.window.folders()[0]
+            # still no luck, go to default
+            except ValueError:
+                previous_path = self.default_path
+
+        return(previous_path)
 
     #   --------------------------------
     #
@@ -163,8 +185,7 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
             self.window.open_file(filepath)
 
         # is file name, but file doesn't exist
-        elif(filepath.rfind(".") > filepath.rfind(self.div) and
-             filepath.rfind(".") != -1):
+        elif(not os.path.isdir(filepath)):
             self.window.open_file(filepath)
 
         # otherwise, create the output file.
@@ -172,8 +193,9 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
             # create new file, and set to scratch for silent closings.
             self.window.new_file()
             self.window.active_view().set_scratch(True)
-            # log the ID of the new window
-            self.active_explorer_windows += [self.window.active_view().id()]
+            # log the ID and filepath of the new window
+            self.active_explorer_windows.update({
+                self.window.active_view().id(): filepath})
 
             # directory => display contents
             if(os.path.isdir(filepath)):
@@ -197,8 +219,74 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
         # get directory contents
         directory_contents = os.listdir(filepath)
 
+        # set file name
+        self.set_file_name(filepath, flags)
+
+        # add title and information
+        self.window.active_view().run_command(
+            "insertfilename", {"line": filepath + "\n\n", "point": 0})
+
+        # display files in directory
+        row = 0
+        for file in directory_contents:
+
+            # get file info (each line in the output view)
+            fileinfo = self.generate_file_info(filepath, file, flags)
+
+            # generate the correct point
+            point = self.window.active_view().text_point(
+                row + self.info_offset, 0)
+            row += 1
+
+            # write file info
+            self.window.active_view().run_command(
+                "insertfilename", {"line": fileinfo, "point": point})
+
+    #   --------------------------------
+    #
+    #   generate file info
+    #
+    #   --------------------------------
+    def generate_file_info(self, filepath, file, flags):
+            # c (clean) flag: just display file name
+            if(flags == "c"):
+                fileinfo = file
+
+            # v flag - output as comma separated values
+            elif(flags == "v"):
+                filesize = os.stat(
+                    filepath + self.div + file).st_size
+                filedate = os.stat(
+                    filepath + self.div + file).st_mtime
+                fileinfo = (str(filedate) + "," +
+                            str(filesize) + "," +
+                            file + ",")
+
+            # normal operation: display file sizes and file names
+            else:
+                # get filesize
+                filesizestr = self.get_filesize_string(
+                    filepath + self.div + file)
+
+                # get date
+                filedatestr = self.get_filedate_string(
+                    filepath + self.div + file)
+
+                # add to file info
+                fileinfo = (filedatestr + (" " * 4) +
+                            filesizestr +
+                            file)
+
+            return(fileinfo)
+
+    #   --------------------------------
+    #
+    #   set file name
+    #
+    #   --------------------------------
+    def set_file_name(self, filepath, flags):
         # set output file name
-        lastdir = filepath[filepath.rfind(self.div):]
+        lastdir = filepath[filepath.rfind(self.div, 0, -1):]
 
         # in csv mode, name the file appropriately
         if(flags == "v"):
@@ -209,78 +297,59 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
                 lastdir = "..." + lastdir
             self.window.active_view().set_name(lastdir)
 
-        # add title and information
-        self.window.active_view().run_command(
-            "insertfilename", {"line": filepath + "\n\n", "point": 0})
+    #   --------------------------------
+    #
+    #   Get filesizestring
+    #
+    #   --------------------------------
+    def get_filesize_string(self, filepath):
+        # get filesize
+        filesize = os.stat(filepath).st_size
 
-        # display files in directory
-        info_offset = 2
-        for x in range(0, len(directory_contents)):
-            point = self.window.active_view().text_point(x + info_offset, 0)
+        # filesize > 1GB -> use GB suffix
+        if(filesize >= 1000000000):
+            filesizestr = str(round(filesize / 1000000000., 1)) + " GB"
+        # 1GB > filesize > 1MB
+        elif(filesize >= 1000000):
+            filesizestr = str(round(filesize / 1000000., 1)) + " MB"
+        # 1MB > filesize > 1KB
+        elif(filesize >= 1000):
+            filesizestr = str(round(filesize / 1000, 1)) + " KB"
+        # 1KB > filesize
+        else:
+            filesizestr = str(filesize) + " bytes"
 
-            # c (clean) flag: just display file name
-            if(flags == "c"):
-                fileinfo = directory_contents[x]
+        # align file names at 12 columns (4 tabs)
+        filesizestr += " " * (12 - len(filesizestr))
 
-            # v flag - output as comma separated values
-            elif(flags == "v"):
-                filesize = os.stat(
-                    filepath + self.div + directory_contents[x]).st_size
-                filedate = os.stat(
-                    filepath + self.div + directory_contents[x]).st_mtime
-                fileinfo = (str(filedate) + "," +
-                            str(filesize) + "," +
-                            directory_contents[x] + ",")
+        return(filesizestr)
 
-            # normal operation: display file sizes and file names
-            else:
-                # get filesize
-                filesize = os.stat(filepath + self.div +
-                                   directory_contents[x]).st_size
+    #   --------------------------------
+    #
+    #   Get filedatestring
+    #
+    #   --------------------------------
+    def get_filedate_string(self, filepath):
 
-                # filesize > 1GB -> use GB suffix
-                if(filesize >= 1000000000):
-                    filesizestr = str(round(filesize / 1000000000., 1)) + " GB"
-                # 1GB > filesize > 1MB
-                elif(filesize >= 1000000):
-                    filesizestr = str(round(filesize / 1000000., 1)) + " MB"
-                # 1MB > filesize > 1KB
-                elif(filesize >= 1000):
-                    filesizestr = str(round(filesize / 1000, 1)) + " KB"
-                # 1KB > filesize
-                else:
-                    filesizestr = str(filesize) + " bytes"
+        months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
-                # align file names at 12 columns (4 tabs)
-                filesizestr += " " * (12 - len(filesizestr))
-                fileinfo = filesizestr + directory_contents[x]
+        filedate = os.stat(filepath).st_mtime
+        filedatelist = datetime.datetime.fromtimestamp(filedate)
 
-                # get date
-                months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                          "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+        # format date as MMM DD HH:MM
+        filedatestr = months[filedatelist.month - 1] + " "
+        if(filedatelist.day < 10):
+            filedatestr += "0"
+        filedatestr += str(filedatelist.day) + " "
+        if(filedatelist.hour < 10):
+            filedatestr += "0"
+        filedatestr += str(filedatelist.hour) + ":"
+        if(filedatelist.minute < 10):
+            filedatestr += "0"
+        filedatestr += str(filedatelist.minute)
 
-                filedate = os.stat(filepath + self.div +
-                                   directory_contents[x]).st_mtime
-                filedatelist = datetime.datetime.fromtimestamp(filedate)
-
-                # format date as MMM DD HH:MM
-                filedatestr = months[filedatelist.month - 1] + " "
-                if(filedatelist.day < 10):
-                    filedatestr += "0"
-                filedatestr += str(filedatelist.day) + " "
-                if(filedatelist.hour < 10):
-                    filedatestr += "0"
-                filedatestr += str(filedatelist.hour) + ":"
-                if(filedatelist.minute < 10):
-                    filedatestr += "0"
-                filedatestr += str(filedatelist.minute)
-
-                # add to file info
-                fileinfo = filedatestr + (" " * 4) + fileinfo
-
-            # write file info
-            self.window.active_view().run_command(
-                "insertfilename", {"line": fileinfo, "point": point})
+        return(filedatestr)
 
     #   --------------------------------
     #
@@ -297,6 +366,13 @@ class emacs_style_file_explorerCommand(sublime_plugin.WindowCommand):
              "point": 0})
 
 
+#   --------------------------------
+#
+#   Insert line
+#
+#   --------------------------------
+
+# for some reason, sublime requires a separate command.
 class insertfilenameCommand(sublime_plugin.TextCommand):
     def run(self, edit, line, point):
         self.view.insert(edit, point, line + "\n")
