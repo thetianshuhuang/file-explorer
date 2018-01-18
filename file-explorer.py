@@ -1,10 +1,13 @@
-import sublime_plugin
+# file-explorer.py
+# main file, main class
+
 import os
-import getpass
-import datetime
+from .fetch_info import *
+from .command_handler import *
+from .filesystem_base import *
 
 
-class fileexplorerCommand(sublime_plugin.WindowCommand):
+class fileexplorerCommand(filesystembaseCommand):
 
     #   --------------------------------
     #
@@ -12,57 +15,22 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
     #
     #   --------------------------------
 
-    # OS secific path information
-    default_linux_path = "/home"
-    default_windows_path = "C:\\Users"
-    unrecognized_os_path = ""
-
-    windows_root = "C:\\"
-    linux_root = "/"
-
-    # OS specific file divisions
-    div_posix = "/"
-    div_nt = "\\"
-    div_unkn = "/"
-
     # plugin data
     active_explorer_windows = {}
     error_descriptions = {
         "PermissionError":
-            "Insufficient permissions."
+            "Insufficient permissions. "
             " Run as root to see the contents of this filepath.",
         "IllegalPathError":
-            "Illegal filepath."
-            "One or more characters in this filepath is forbidden."
+            "Illegal filepath. "
+            "One or more characters in this filepath is forbidden.",
+        "UnknownError":
+            "Unknown error. "
+            "Something's wrong with this filepath in an unanticipated manner"
     }
 
     # plugin settings
     info_offset = 2
-
-    #   --------------------------------
-    #
-    #   Set up OS localization
-    #
-    #   --------------------------------
-    def set_up_os(self):
-
-        username = getpass.getuser()
-
-        # detect operating system
-        if (os.name == 'posix'):
-            self.default_path = (
-                self.default_linux_path + self.div_posix + username)
-            self.div = self.div_posix
-            self.root_dir = self.linux_root
-        elif (os.name == 'nt'):
-            self.default_path = (
-                self.default_windows_path + self.div_nt + username)
-            self.div = self.div_nt
-            self.root_dir = self.windows_root
-        else:
-            self.default_path = self.unrecognized_os_path
-            self.div = self.div_unkn
-            self.root_dir = self.unrecognized_os_path
 
     #   --------------------------------
     #
@@ -83,102 +51,12 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
         # set up operating system compatibility
         self.set_up_os()
 
-        # process command and separate flags
-        processed_command = self.identify_flags(text)
-        text = processed_command[0]
-        flags = processed_command[1]
-
         # generate filepath
-        filepath = self.compute_filepath(text)
+        (filepath, flags) = compute_filepath(
+            self.check_active_view(), self.div, self.root_dir, text)
 
         # open the filepath
         self.open_path(filepath, flags)
-
-    #   --------------------------------
-    #
-    #   Compute filepath
-    #
-    #   --------------------------------
-    def compute_filepath(self, text):
-        previous_path = self.check_active_view()
-
-        # Special case: ".." (go up one directory)
-        # if statement provides protection for going up too far
-        if(text == ".."):
-            lastdirindex = previous_path.rfind(
-                self.div, 0, len(previous_path) - 1)
-            if(lastdirindex >= 0):
-                filepath = previous_path[:lastdirindex]
-            else:
-                filepath = previous_path
-            # empty filepath protection
-            if(filepath == ""):
-                filepath = self.root_dir
-
-        # Special case: "." (do nothing)
-        elif(text == "."):
-            filepath = previous_path
-
-        # If the input filepath is absolute:
-        elif(self.is_absolute(text)):
-            filepath = text
-
-        # Else, the input should be appended to the existing path
-        else:
-            # add dividing '\' if one does not already exist
-            if(previous_path[-1:] != self.div):
-                previous_path += self.div
-            filepath = previous_path + text
-
-        # collapse '/../' operator
-        filepath = self.collapse_parent_dir(filepath)
-
-        return(filepath)
-
-    #   --------------------------------
-    #
-    #   Check if the filepath is absolute
-    #
-    #   --------------------------------
-    def is_absolute(self, text):
-
-        # on linux, check if the first character is "/"
-        if(os.name == "posix"):
-            if(text[0] == self.div):
-                return(True)
-            else:
-                return(False)
-
-        # on windows, check if the first three chars are "X:/"
-        # for an arbitrary (capital) drive letter X
-        elif(os.name == "nt"):
-            if(text[0].isupper() and text[1] == ":"):
-                return(True)
-            else:
-                return(False)
-
-        # on unknown systems, assume that it has linux-like behavior
-        else:
-            if(text[0] == self.div):
-                return(True)
-            else:
-                return(False)
-
-    #   --------------------------------
-    #
-    #   Collapse parent directory operators
-    #
-    #   --------------------------------
-    def collapse_parent_dir(self, filepath):
-        location = filepath.find(self.div + "..")
-        while(location > 0):
-            elimstart = filepath.rfind(self.div, 0, location)
-            if(elimstart <= 0):
-                elimstart = location
-            filepath = filepath[0:elimstart] + filepath[location + 3:]
-            location = filepath.find(self.div + "..")
-
-        return(filepath)
 
     #   --------------------------------
     #
@@ -206,46 +84,32 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
 
     #   --------------------------------
     #
-    #   Show input window
-    #
-    #   --------------------------------
-    def identify_flags(self, text):
-        lastslash = text.rfind(self.div)
-        lastdash = text.rfind(" -")
-
-        if(lastdash > lastslash and lastdash > 0):
-            flags = text[lastdash + 2:]
-            text = text[0:lastdash]
-        else:
-            flags = ""
-
-        return((text, flags))
-
-    #   --------------------------------
-    #
     #   Open the path
     #
     #   --------------------------------
     def open_path(self, filepath, flags):
 
-        # check for invalid filepaths
-        exception_type = self.check_for_exceptions(filepath)
-        if(exception_type != "pass"):
-            self.create_new_view(filepath)
-            self.display_error_message(filepath, exception_type)
+        exception_type = check_for_exceptions(self.illegal_chars, filepath)
 
-        # file => open it
-        elif(os.path.isfile(filepath)):
-            self.window.open_file(filepath)
+        # The file passes the exception test.
+        if(exception_type == "pass"):
+            # file => open it
+            if(os.path.isfile(filepath)):
+                self.window.open_file(filepath)
 
-        # is file name, but file doesn't exist
-        elif(not os.path.isdir(filepath)):
-            self.window.open_file(filepath)
+            # directory => display contents
+            elif(os.path.isdir(filepath)):
+                self.create_new_view(filepath)
+                self.display_directory_contents(filepath, flags)
 
-        # otherwise, create the output file.
+            # neither file nor directory, so create a file
+            else:
+                self.window.open_file(filepath)
+
+        # raise error message
         else:
             self.create_new_view(filepath)
-            self.display_directory_contents(filepath, flags)
+            self.display_error_message(filepath, exception_type)
 
     #   --------------------------------
     #
@@ -259,20 +123,6 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
             # log the ID and filepath of the new window
             self.active_explorer_windows.update({
                 self.window.active_view().id(): filepath})
-
-    #   --------------------------------
-    #
-    #   Check for exceptions in the filepath
-    #
-    #   --------------------------------
-    def check_for_exceptions(self, filepath):
-        try:
-            os.listdir(filepath)
-            return("pass")
-        except OSError:
-            return("IllegalPathError")
-        except PermissionError:
-            return("PermissionError")
 
     #   --------------------------------
     #
@@ -293,14 +143,14 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
 
         # add title and information
         self.window.active_view().run_command(
-            "insertfilename", {"line": filepath + "\n\n", "point": 0})
+            "insertline", {"line": filepath + "\n\n", "point": 0})
 
         # display files in directory
         row = 0
         for file in directory_contents:
 
             # get file info (each line in the output view)
-            fileinfo = self.generate_file_info(filepath, file, flags)
+            fileinfo = generate_file_info(self.div, filepath, file, flags)
 
             # generate the correct point
             point = self.window.active_view().text_point(
@@ -309,47 +159,7 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
 
             # write file info
             self.window.active_view().run_command(
-                "insertfilename", {"line": fileinfo, "point": point})
-
-    #   --------------------------------
-    #
-    #   generate file info
-    #
-    #   --------------------------------
-    def generate_file_info(self, filepath, file, flags):
-            # c (clean) flag: just display file name
-            if(flags == "c"):
-                fileinfo = file
-
-            # v flag - output as comma separated values
-            elif(flags == "v"):
-                try:
-                    filesize = os.stat(
-                        filepath + self.div + file).st_size
-                    filedate = os.stat(
-                        filepath + self.div + file).st_mtime
-                    fileinfo = (str(filedate) + "," +
-                                str(filesize) + "," +
-                                file + ",")
-                except PermissionError:
-                    fileinfo = ("ERR,ERR," + file + ",")
-
-            # normal operation: display file sizes and file names
-            else:
-                # get filesize
-                filesizestr = self.get_filesize_string(
-                    filepath + self.div + file)
-
-                # get date
-                filedatestr = self.get_filedate_string(
-                    filepath + self.div + file)
-
-                # add to file info
-                fileinfo = (filedatestr +
-                            filesizestr +
-                            file)
-
-            return(fileinfo)
+                "insertline", {"line": fileinfo, "point": point})
 
     #   --------------------------------
     #
@@ -371,95 +181,15 @@ class fileexplorerCommand(sublime_plugin.WindowCommand):
 
     #   --------------------------------
     #
-    #   Get filesizestring
-    #
-    #   --------------------------------
-    def get_filesize_string(self, filepath):
-        # get filesize
-        try:
-            filesize = os.stat(filepath).st_size
-        except PermissionError:
-            filesize = -1
-
-        # filesize > 1GB -> use GB suffix
-        if(filesize >= 1000000000):
-            filesizestr = str(round(filesize / 1000000000., 1)) + " GB"
-        # 1GB > filesize > 1MB
-        elif(filesize >= 1000000):
-            filesizestr = str(round(filesize / 1000000., 1)) + " MB"
-        # 1MB > filesize > 1KB
-        elif(filesize >= 1000):
-            filesizestr = str(round(filesize / 1000, 1)) + " KB"
-        # 1KB > filesize
-        elif(filesize >= 0):
-            filesizestr = str(filesize) + " bytes"
-        # Error state
-        else:
-            filesizestr = ""
-
-        # align file names at 12 columns (4 tabs)
-        filesizestr += " " * (12 - len(filesizestr))
-
-        return(filesizestr)
-
-    #   --------------------------------
-    #
-    #   Get filedatestring
-    #
-    #   --------------------------------
-    def get_filedate_string(self, filepath):
-
-        months = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-
-        try:
-            filedate = os.stat(filepath).st_mtime
-        except PermissionError:
-            filedate = -1
-
-        if(filedate >= 0):
-            filedatelist = datetime.datetime.fromtimestamp(filedate)
-
-            # format date as MMM DD HH:MM
-            filedatestr = months[filedatelist.month - 1] + " "
-            if(filedatelist.day < 10):
-                filedatestr += "0"
-            filedatestr += str(filedatelist.day) + " "
-            if(filedatelist.hour < 10):
-                filedatestr += "0"
-            filedatestr += str(filedatelist.hour) + ":"
-            if(filedatelist.minute < 10):
-                filedatestr += "0"
-            filedatestr += str(filedatelist.minute) + " " * 4
-
-        else:
-            filedatestr = "PermissionError "
-
-        return(filedatestr)
-
-    #   --------------------------------
-    #
     #   Display error message
     #
     #   --------------------------------
     def display_error_message(self, filepath, errormessage):
 
-        self.window.active_view().set_name("Error")
+        self.window.active_view().set_name(errormessage)
         self.window.active_view().run_command(
-            "insertfilename",
+            "insertline",
             {"line": filepath + "\n" +
              errormessage + "\n" +
              self.error_descriptions[errormessage],
              "point": 0})
-
-
-#   --------------------------------
-#
-#   Insert line
-#
-#   --------------------------------
-
-# for some reason, sublime requires a separate command.
-class insertfilenameCommand(sublime_plugin.TextCommand):
-    def run(self, edit, line, point):
-        self.view.insert(edit, point, line + "\n")
