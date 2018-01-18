@@ -7,26 +7,26 @@ Behaves like the open file command in Emacs. Enter a filepath; if the filepath i
 
 ## Directory options:
 - List current directory contents:
-'''
+```
 .
-'''
+```
 - List parent directory contents:
-'''
+```
 ..
-'''
+```
 - The parent directory operator can be used multiple timmes in a directory. For example,
-'''
+```
 \home\user\dir\..\..
-'''
+```
 will display the contents of \home.
 - 'Clean' output (do not display file properties):
-'''
+```
 \filepath -c
-'''
+```
 - CSV output (output directory contents as comma-separated values):
-'''
+```
 \filepath -v
-'''
+```
 
 ## Behavior:
 - Calling the fileexplorerCommand while viewing a previous directory output will close the previous output view before opening a new one.
