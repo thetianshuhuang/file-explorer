@@ -52,11 +52,30 @@ class fileexplorerCommand(filesystembaseCommand):
         self.set_up_os()
 
         # generate filepath
+        previous_path = self.check_active_view()
+
+        # handle special case (choose from open project folders)
+        if(previous_path == "..."):
+            text = self.find_folder(text)
+
+        # get filepath and flags
         (filepath, flags) = compute_filepath(
-            self.check_active_view(), self.div, self.root_dir, text)
+            previous_path, self.div, self.root_dir, text)
 
         # open the filepath
         self.open_path(filepath, flags)
+
+    #   --------------------------------
+    #
+    #   Find filepath from last directory name
+    #
+    #   --------------------------------
+    def find_folder(self, text):
+        for folder in self.window.folders():
+            if(folder.rfind(text) + len(text) == len(folder)):
+                filepath = folder
+                return(filepath)
+        return(text)
 
     #   --------------------------------
     #
@@ -84,32 +103,70 @@ class fileexplorerCommand(filesystembaseCommand):
 
     #   --------------------------------
     #
+    #   Display open folders
+    #
+    #   --------------------------------
+    def display_open_folders(self, flags):
+
+        # label tab as 'Open Folders'
+        self.window.active_view().set_name("Open Folders")
+
+        # print out description
+        self.window.active_view().run_command(
+            "insertline",
+            {"line": "Currently Open Project Folders: \n", "point": 0})
+
+        row = 0
+        for folder in self.window.folders():
+
+            file = folder[folder.rfind(self.div) + 1:]
+
+            fileinfo = generate_file_info(folder, file, flags)
+
+            # generate the correct point
+            point = self.window.active_view().text_point(
+                row + self.info_offset, 0)
+            row += 1
+
+            # write file info
+            self.window.active_view().run_command(
+                "insertline", {"line": fileinfo, "point": point})
+
+    #   --------------------------------
+    #
     #   Open the path
     #
     #   --------------------------------
     def open_path(self, filepath, flags):
 
-        exception_type = check_for_exceptions(self.illegal_chars, filepath)
-
-        # The file passes the exception test.
-        if(exception_type == "pass"):
-            # file => open it
-            if(os.path.isfile(filepath)):
-                self.window.open_file(filepath)
-
-            # directory => display contents
-            elif(os.path.isdir(filepath)):
-                self.create_new_view(filepath)
-                self.display_directory_contents(filepath, flags)
-
-            # neither file nor directory, so create a file
-            else:
-                self.window.open_file(filepath)
-
-        # raise error message
-        else:
+        # Special control command: list open files
+        if(filepath == "..."):
             self.create_new_view(filepath)
-            self.display_error_message(filepath, exception_type)
+            self.display_open_folders(flags)
+
+        # Normal control command
+        else:
+            exception_type = check_for_exceptions(self.illegal_chars, filepath)
+
+            # The file passes the exception test.
+            if(exception_type == "pass"):
+                # file => open it
+                if(os.path.isfile(filepath)):
+                    self.window.open_file(filepath)
+
+                # directory => display contents
+                elif(os.path.isdir(filepath)):
+                    self.create_new_view(filepath)
+                    self.display_directory_contents(filepath, flags)
+
+                # neither file nor directory, so create a file
+                else:
+                    self.window.open_file(filepath)
+
+            # raise error message
+            else:
+                self.create_new_view(filepath)
+                self.display_error_message(filepath, exception_type)
 
     #   --------------------------------
     #
@@ -150,7 +207,8 @@ class fileexplorerCommand(filesystembaseCommand):
         for file in directory_contents:
 
             # get file info (each line in the output view)
-            fileinfo = generate_file_info(self.div, filepath, file, flags)
+            fileinfo = generate_file_info(
+                filepath + self.div + file, file, flags)
 
             # generate the correct point
             point = self.window.active_view().text_point(

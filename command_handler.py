@@ -19,7 +19,7 @@ def identify_flags(div, text):
     else:
         flags = ""
 
-    return((text, flags))
+    return(text, flags)
 
 
 #   --------------------------------
@@ -102,9 +102,14 @@ def compute_filepath(previous_path, div, root_dir, text):
     # process command and separate flags
     (text, flags) = identify_flags(div, text)
 
+    # Special case: "..." (list currently open folders and choose one)
+    if(text == "..."):
+        # return "..."
+        filepath = "..."
+
     # Special case: ".." (go up one directory)
     # if statement provides protection for going up too far
-    if(text == ".."):
+    elif(text == ".."):
         lastdirindex = previous_path.rfind(
             div, 0, len(previous_path) - 1)
         if(lastdirindex >= 0):

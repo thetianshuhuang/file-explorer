@@ -10,7 +10,7 @@ import datetime
 #   generate file info
 #
 #   --------------------------------
-def generate_file_info(div, filepath, file, flags):
+def generate_file_info(filepath, file, flags):
         # c (clean) flag: just display file name
         if(flags == "c"):
             fileinfo = file
@@ -19,9 +19,9 @@ def generate_file_info(div, filepath, file, flags):
         elif(flags == "v"):
             try:
                 filesize = os.stat(
-                    filepath + div + file).st_size
+                    filepath).st_size
                 filedate = os.stat(
-                    filepath + div + file).st_mtime
+                    filepath).st_mtime
                 fileinfo = (str(filedate) + "," +
                             str(filesize) + "," +
                             file + ",")
@@ -31,10 +31,10 @@ def generate_file_info(div, filepath, file, flags):
         # normal operation: display file sizes and file names
         else:
             # get filesize
-            filesizestr = get_filesize_string(filepath + div + file)
+            filesizestr = get_filesize_string(filepath)
 
             # get date
-            filedatestr = get_filedate_string(filepath + div + file)
+            filedatestr = get_filedate_string(filepath)
 
             # add to file info
             fileinfo = (filedatestr +
