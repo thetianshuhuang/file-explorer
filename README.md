@@ -14,6 +14,10 @@ Behaves like the open file command in Emacs. Enter a filepath; if the filepath i
 ```
 ..
 ```
+- List open folders in project:
+```
+...
+```
 - The parent directory operator can be used multiple timmes in a directory. For example,
 ```
 \home\user\dir\..\..
