@@ -15,20 +15,6 @@ class fileexplorerCommand(filesystembaseCommand):
     #
     #   --------------------------------
 
-    # plugin data
-    active_explorer_windows = {}
-    error_descriptions = {
-        "PermissionError":
-            "Insufficient permissions. "
-            " Run as root to see the contents of this filepath.",
-        "IllegalPathError":
-            "Illegal filepath. "
-            "One or more characters in this filepath is forbidden.",
-        "UnknownError":
-            "Unknown error. "
-            "Something's wrong with this filepath in an unanticipated manner"
-    }
-
     # plugin settings
     info_offset = 2
 
@@ -83,20 +69,25 @@ class fileexplorerCommand(filesystembaseCommand):
     #
     #   --------------------------------
     def check_active_view(self):
+        # check if view is in database
+        self.window.run_command(
+            "viewmanager", {"method": "is_registered_view", "label": ""})
+        view_id = self.get_return("view_id")
+        previous_path = self.get_return("label")
 
-        active_view = self.window.active_view().id()
+        # view in db
+        if(view_id != 0):
+            # close view
+            self.window.run_command(
+                "viewmanager", {"method": "close_view", "label": ""})
 
-        # close an existing directory list of a new one is being opened on top.
-        # set the previous path to the saved one
-        try:
-            previous_path = self.active_explorer_windows[active_view]
-            self.window.run_command("close")
-        except KeyError:
-            # otherwise, set to the first open folder
-            try:
+        # view not in db
+        else:
+            # list of open project folders is not empty
+            if(len(self.window.folders()) > 0):
                 previous_path = self.window.folders()[0]
             # still no luck, go to default
-            except ValueError:
+            else:
                 previous_path = self.default_path
 
         return(previous_path)
@@ -165,8 +156,9 @@ class fileexplorerCommand(filesystembaseCommand):
 
             # raise error message
             else:
-                self.create_new_view(filepath)
-                self.display_error_message(filepath, exception_type)
+                self.window.run_command(
+                    "displayerrormessage",
+                    {"filepath": filepath, "errortype": exception_type})
 
     #   --------------------------------
     #
@@ -174,12 +166,9 @@ class fileexplorerCommand(filesystembaseCommand):
     #
     #   --------------------------------
     def create_new_view(self, filepath):
-            # set to scratch for silent closings.
-            self.window.new_file()
-            self.window.active_view().set_scratch(True)
-            # log the ID and filepath of the new window
-            self.active_explorer_windows.update({
-                self.window.active_view().id(): filepath})
+            self.window.run_command(
+                "viewmanager",
+                {"method": "create_new_view", "label": filepath})
 
     #   --------------------------------
     #
@@ -236,18 +225,3 @@ class fileexplorerCommand(filesystembaseCommand):
             if(lastdir != filepath):
                 lastdir = "..." + lastdir
             self.window.active_view().set_name(lastdir)
-
-    #   --------------------------------
-    #
-    #   Display error message
-    #
-    #   --------------------------------
-    def display_error_message(self, filepath, errormessage):
-
-        self.window.active_view().set_name(errormessage)
-        self.window.active_view().run_command(
-            "insertline",
-            {"line": filepath + "\n" +
-             errormessage + "\n" +
-             self.error_descriptions[errormessage],
-             "point": 0})

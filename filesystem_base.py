@@ -1,6 +1,7 @@
 # filesystem_base
 # base class for filesystem handling
 
+import sublime
 import sublime_plugin
 import os
 import getpass
@@ -59,12 +60,13 @@ class filesystembaseCommand(sublime_plugin.WindowCommand):
             self.root_dir = self.unrecognized_os_path
             self.illegal_chars = self.default_illegal_chars
 
+    #   --------------------------------
+    #
+    #   Inter-plugin communication using settings file
+    #
+    #   --------------------------------
+    def get_return(self, var_label):
+        return_drop_file = sublime.load_settings(
+            "return_drop_file.sublime-settings")
 
-#   --------------------------------
-#
-#   Insert line command
-#
-#   --------------------------------
-class insertlineCommand(sublime_plugin.TextCommand):
-    def run(self, edit, line, point):
-        self.view.insert(edit, point, line + "\n")
+        return(return_drop_file.get(var_label))
