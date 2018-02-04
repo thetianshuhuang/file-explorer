@@ -50,6 +50,10 @@ def generate_file_info(filepath, file, flags):
 #
 #   --------------------------------
 def get_filesize_string(filepath):
+
+    if(os.path.isdir(filepath)):
+        return(" " * 12)
+
     # get filesize
     try:
         filesize = os.stat(filepath).st_size
