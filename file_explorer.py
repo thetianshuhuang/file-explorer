@@ -195,18 +195,20 @@ class fileexplorerCommand(filesystembaseCommand):
         row = 0
         for file in directory_contents:
 
-            # get file info (each line in the output view)
-            fileinfo = generate_file_info(
-                filepath + self.div + file, file, flags)
+            # don't display hidden files unless the 'a' flag is passed
+            if(file[0] != '.' or 'a' in flags):
+                # get file info (each line in the output view)
+                fileinfo = generate_file_info(
+                    filepath + self.div + file, file, flags)
 
-            # generate the correct point
-            point = self.window.active_view().text_point(
-                row + self.info_offset, 0)
-            row += 1
+                # generate the correct point
+                point = self.window.active_view().text_point(
+                    row + self.info_offset, 0)
+                row += 1
 
-            # write file info
-            self.window.active_view().run_command(
-                "insertline", {"line": fileinfo, "point": point})
+                # write file info
+                self.window.active_view().run_command(
+                    "insertline", {"line": fileinfo, "point": point})
 
     #   --------------------------------
     #

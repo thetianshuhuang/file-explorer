@@ -19,6 +19,7 @@ def identify_flags(div, text):
     else:
         flags = ""
 
+    print(flags)
     return(text, flags)
 
 

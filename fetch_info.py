@@ -12,11 +12,11 @@ import datetime
 #   --------------------------------
 def generate_file_info(filepath, file, flags):
         # c (clean) flag: just display file name
-        if(flags == "c"):
+        if('c' in flags):
             fileinfo = file
 
         # v flag - output as comma separated values
-        elif(flags == "v"):
+        elif('v' in flags):
             try:
                 filesize = os.stat(
                     filepath).st_size
