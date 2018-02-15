@@ -212,7 +212,6 @@ class fileexplorerCommand(filesystembaseCommand):
     #
     #   set file name
     #
-    #   --------------------------------
     def set_file_name(self, filepath, flags):
         # set output file name
         lastdir = filepath[filepath.rfind(self.div, 0, -1):]
