@@ -24,6 +24,7 @@ class fileexplorerCommand(filesystembaseCommand):
     #
     #   --------------------------------
     def run(self):
+        print("run")
         self.window.show_input_panel(
             "Find file:", "", self.on_done, None, None)
 

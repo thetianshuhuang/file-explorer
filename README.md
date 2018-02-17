@@ -31,6 +31,10 @@ will display the contents of \home.
 ```
 \filepath -v
 ```
+- Show hidden files (not shown by default):
+```
+\filepath -a
+```
 
 ## Behavior:
 - Calling the fileexplorerCommand while viewing a previous directory output will close the previous output view before opening a new one.
